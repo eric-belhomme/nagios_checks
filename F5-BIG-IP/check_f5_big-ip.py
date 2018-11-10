@@ -16,7 +16,6 @@ retText = [
 ]
 
 
-
 def get_health_status():
     '''
 warning and critical values are tuples for respectively psu, temp, fans triggers
@@ -261,7 +260,7 @@ warning and critical values are tuples for respectively : actives_cnx,max_cnx,to
     return retcode
 
 
-def get_node_stats(virtualServer, perfdata=False):
+def get_node_stats(perfdata=False):
 
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
@@ -323,13 +322,17 @@ snmpSession = netsnmp.Session(Version=2, DestHost=args.hostname, Community=args.
 message = []
 perfdata = []
 
-
-#retcode = get_health_status()
-#retcode = enum_virtualservers()
-#retcode = get_vs_stats()
-retcode = get_node_stats('',True)
-
-
+if args.mode == 'health':
+    retcode = get_health_status()
+elif args.mode == 'enumvs':
+    retcode = enum_virtualservers()
+elif args.mode == 'vsstats':
+    retcode = get_vs_stats(args.perfdata)
+elif args.mode == 'nodestats':
+    retcode = get_node_stats(args.perfdata)
 
 print("{}: ".format(retText[retcode]) + "".join(message))
+if args.perfdata and len(perfdata):
+    print('|' + "".join(' '))
+
 exit(retcode)
