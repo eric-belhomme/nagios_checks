@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # vim: expandtab sw=4 ts=4:
-# 
-# F5 Load-Balancer running BIG-IP OS Nagios plugin
-#
-# 2018-11-10 Eric Belhomme <eric.belhomme@axians.com> - Initial write
-
+"""
+F5 Load-Balancer running BIG-IP OS Nagios plugin
+2018-11-10 Eric Belhomme <rico-github@ricozome.net> - Initial work
+Published under MIT license
+"""
 import argparse, netsnmp
+
+__author__ = 'Eric Belhomme'
+__contact__ = 'rico-github@ricozome.net'
+__license__ = 'MIT'
+
 
 retText = [
     'OK',
@@ -16,16 +21,64 @@ retText = [
 ]
 
 
-def get_health_status():
+def print_longHelp():
+    print("""
+F5 Load-Balancer running BIG-IP OS Nagios plugin
+
+*** modes ***
+  help      : This help     
+  health    : Reports global system health
+  http      : Reports global HTTP requests
+  enumvs    : enumerates 'VirtualServers' configured on the appliance
+  vsstats   : get statistics for a given VirtualServer
+  nodestats : get statistics for remote Nodes (real servers)
+
+    """)
+    print('*** health mode ***\n' + get_health_status.__doc__)
+    print('*** http mode ***\n' + get_http_stats.__doc__)
+    print('*** enumvs mode ***\n' + enum_virtualservers.__doc__)
+    print('*** vsstats mode ***\n' + get_vs_stats.__doc__)
+    print('*** nodestats mode ***\n' + get_node_stats.__doc__)
+   
+    print("Copyright {author} <{authmail}> under {license} license".format(
+        author = __author__, authmail = __contact__, license = __license__))
+    exit(0)
+
+
+def get_health_status(perfdata):
     '''
-warning and critical values are tuples for respectively psu, temp, fans triggers
-arg1 contains flags that alters the check behaviour :
-- ignoremissingpsu : don't trigger any warning or error is a PSU is reported as missing
-- warnmissingpsu   : trigger warning (instead of critical) error is a PSU is reported as missing
-- ignoremissingfan : don't trigger any warning or error is a fan is reported as missing
-- warnmissingfan   : trigger warning (instead of critical) error is a fan is reported as missing
+Report global system health: PSU health, chassis temperature, and fans health
+
+Warning and critical triggers (respectively '-w' and '-c' command-line
+parameters) are passed as 3 comma-separated values for respectively
+PSU, temp, and fans:
+
+    -w 1,35,3 will set warning values as below:
+        -> 1 failed PSU
+        -> 35°C for temperature
+        -> 3 failed fans
+
+Additionnaly, it is possible to alter default behaviour with the following
+flags, passed with '--arg1' command-lien parameter:
+
+    ignoremissingpsu : don't trigger any warning or error is a PSU is
+                       reported as missing
+    warnmissingpsu   : trigger warning (instead of critical) error is a PSU
+                       is reported as missing
+    ignoremissingfan : don't trigger any warning or error is a fan is
+                       reported as missing
+    warnmissingfan   : trigger warning (instead of critical) error is a fan
+                       is reported as missing
+
+    --arg1=ignoremissingpsu,warnmissingfan
 
     '''
+    # Sessions concurrentes (coté clients)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.8.x
+    # Sessions concurrentes (coté serveurs)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.15.x
+    # Nombre Max de Sessions Simultanées (coté client)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.6.x
+    # Nombre Max de Sessions Simultanées (coté serveurs)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.13.x
+    # Sessions Totales (coté clients)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.7.x
+    # Sessions Totales (coté serveurs)	Get	.1.3.6.1.4.1.3375.2.1.1.2.1.14.x
     warn = ('1','40','1')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
@@ -149,6 +202,15 @@ def _enum_virtualservers():
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.2.3.1.1')))
 
 def enum_virtualservers():
+    '''
+Enumerates 'VirtualServers' configured on the appliance
+
+This mode is mainly used to ease Nagios configuration to define how to use
+'vsstats' mode
+
+This mode does not require any additional parameters
+
+    '''
 
     vals = _enum_virtualservers()
     if vals:
@@ -219,10 +281,26 @@ def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
 
 def get_vs_stats(virtualServer, perfdata=False):
     '''
-Retrieve F5 VirtualServer statics
-warning and critical values are tuples for respectively : actives_cnx,max_cnx,total_cnx
-    '''
+Get statistics for a given VirtualServer, the target VS is passed as '--arg1'
+parameter.
 
+The check returns the following informations:
+  o VirtualServer name and status,
+  o connections details (current, max, total)
+  o bandwidth usage (incoming bytes, outgoing bytes)
+
+Warning and critical triggers (respectively '-w' and '-c' command-line
+parameters) are passed as 3 comma-separated values for respectively
+active connections, max connections, total connections
+
+If ommited, defaults to :
+    -w 200000,200000,200000
+    -c 250000,250000,250000
+
+Additionally, if '--perfdata' command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+    '''
 
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
@@ -261,7 +339,26 @@ warning and critical values are tuples for respectively : actives_cnx,max_cnx,to
 
 
 def get_node_stats(perfdata=False):
+    '''
+Get statistics for Nodes, the 'real' servers behind the Load Balancer.
 
+The check returns for each node found the following informations:
+  o Node name and status,
+  o connections details (current, max, total)
+  o bandwidth usage (incoming bytes, outgoing bytes)
+
+Warning and critical triggers (respectively '-w' and '-c' command-line
+parameters) are passed as 3 comma-separated values for respectively
+active connections, max connections, total connections
+
+If ommited, defaults to :
+    -w 200000,200000,200000
+    -c 250000,250000,250000
+
+Additionally, if '--perfdata' command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+    '''
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
@@ -293,19 +390,63 @@ def get_node_stats(perfdata=False):
     return retcode
 
 
+def get_http_stats(perfdata):
+    '''
+Reports global HTTP requests
+
+Warning and critical triggers (respectively '-w' and '-c' command-line
+parameters) 
+
+If ommited, defaults to :
+    -w 200000
+    -c 250000
+    
+Additionally, if '--perfdata' command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+No additional arguments are required
+
+    '''
+    retcode = 3
+    warn = '200000'
+    if isinstance(args.warning,str) and args.warning is not None:
+        warn = int(args.warning.split)
+    crit = '250000'
+    if isinstance(args.critical,str) and args.critical is not None:
+        crit = int(args.critical.split)
+
+    vals = map( int, snmpSession.get(netsnmp.VarList(netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.56.0'))))
+    if len(vals):
+        val = vals[0]
+        if val > warn:
+            retcode = 1
+        if val > crit:
+            retcode = 2
+        message.append("global HTTP requests: {}".format(val))
+        if perfdata:
+            perfmsg.append("'http_req': {}:{}:{}".format(str(val), str(warn), str(crit)))
+    else:
+        retcode = 3
+        message.append('Failed to retrieve HTTP session data')
+
+    return retcode
 
 
+
+
+
+##### Main starts here
 
 parser = argparse.ArgumentParser(description='Nagios check for F5 BIG-IP OS-based Load-Balancer')
 parser.add_argument('-H', '--hostname', type=str, help='hostname or IP address', required=True)
 parser.add_argument('-C', '--community', type=str, help='SNMP community (currently only v2c)', required=True)
 parser.add_argument('-m', '--mode', type=str, help='Operational mode',
     choices = [
+        'help',
         'health',
         'http',
         'enumvs',
         'vsstats',
-        'enumnodes',
         'nodestats',
     ],
     required=True)
@@ -316,14 +457,15 @@ parser.add_argument('-c', '--critical', type=int, nargs='?', help='critical trig
 
 args = parser.parse_args()
 retcode = 3
-
-snmpSession = netsnmp.Session(Version=2, DestHost=args.hostname, Community=args.community)
-
 message = []
 perfdata = []
 
-if args.mode == 'health':
-    retcode = get_health_status()
+snmpSession = netsnmp.Session(Version=2, DestHost=args.hostname, Community=args.community)
+
+if args.mode == 'help':
+    print_longHelp()
+elif args.mode =='health':
+    retcode = get_health_status(args.perfdata)
 elif args.mode == 'enumvs':
     retcode = enum_virtualservers()
 elif args.mode == 'vsstats':
@@ -333,6 +475,8 @@ elif args.mode == 'vsstats':
         message.append('arg1 not provided (VirtualServer)')
 elif args.mode == 'nodestats':
     retcode = get_node_stats(args.perfdata)
+elif args.mode == 'http':
+    get_http_stats(args.perfdata)
 
 print("{}: ".format(retText[retcode]) + "".join(message))
 if args.perfdata and len(perfdata):
