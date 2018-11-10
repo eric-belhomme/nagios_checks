@@ -17,7 +17,7 @@ retText = [
 
 
 
-def _get_health_status():
+def get_health_status():
     '''
 warning and critical values are tuples for respectively psu, temp, fans triggers
 arg1 contains flags that alters the check behaviour :
@@ -147,7 +147,7 @@ arg1 contains flags that alters the check behaviour :
 
 
 
-def _enum_virtualservers():
+def enum_virtualservers():
 
     vals = snmpSession.walk(netsnmp.VarList(
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.13.2.1.1'),
@@ -160,15 +160,10 @@ def _enum_virtualservers():
         message.append('Unable to retrieve VirtualServer informations')
         return 3
     return 0
-    
 
-def _get_vs_stats(virtualServer, perfdata=False):
-    '''
-Retrieve F5 VirtualServer statics
-warning and critical values are tuples for respectively : actives_cnx,max_cnx,total_cnx
-    '''
 
-    ltmVsStatusAvailState [
+def _check_avail(status, strType, strObject):
+    ltmVsStatusAvailState = [
         ('none',   'error'),                        # 0
         ('green',  'available in some capacity'),   # 1
         ('yellow', 'not currently available'),      # 2
@@ -176,11 +171,66 @@ warning and critical values are tuples for respectively : actives_cnx,max_cnx,to
         ('blue',   'availability is unknown'),      # 4
         ('gray',   'unlicensed'),                   # 5
     ]
+    retcode = 0
+    if status < 0 or status > 5:
+        retcode = 3
+        message.append("Failed to retrieve {} status information".format(strObject))
+    else:
+        message.append("{} {} status {} ({})\n".format(strType, strObject, ltmVsStatusAvailState[status][0], ltmVsStatusAvailState[status][1]))
+        if status == 4:
+            retcode = 3
+        elif status == 1 or status == 5:
+            retcode = 1
+        elif status == 0 or status == 3:
+            retcode = 2
+    return retcode
 
-    warn = ('1','40','1')
+
+def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit):
+    retcode, ret = 0, 0
+    # check actives connections
+    cnx_actives = int(cnx_actives)
+    if cnx_actives > warn[0]:
+        ret = 1
+    if cnx_actives > crit[0]:
+        ret = 2
+    message.append(" - {} actives connections".format(str(cnx_actives)))
+    if ret > retcode:
+        retcode = ret
+    if perfdata:
+        perfmsg.append("'cnx_actv': {}:{}:{}".format(str(cnx_actives), str(warn[0]), str(crit[0])))
+    # check total connections
+    ret = 0
+    cnx_total = int(cnx_total)
+    if cnx_total > warn[2]:
+        ret = 1
+    if cnx_total > crit[2]:
+        ret = 2
+    message.append(" - {} max connections".format(str(cnx_total)))
+    if ret > retcode:
+        retcode = ret
+    if perfdata:
+        perfmsg.append("'cnx_total': {}:{}:{}".format(str(cnx_total), str(warn[2]), str(crit[2])))
+    message.append( " - bytes in: {}, bytes out: {}\n".format(bytes_in, bytes_out))
+    if perfdata:
+        perfmsg.append("'bytes_in':".format(bytes_in))
+        perfmsg.append("'bytes_out':".format(bytes_out))
+    return retcode
+    
+
+def get_vs_stats(virtualServer, perfdata=False):
+    '''
+Retrieve F5 VirtualServer statics
+warning and critical values are tuples for respectively : actives_cnx,max_cnx,total_cnx
+    '''
+
+
+    warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
-    crit = ('1','50','2')
+    crit = ('250000','250000','250000')
+    if isinstance(args.critical,str) and args.critical is not None:
+        crit = tuple(args.critical.split(','))
     retcode = 0
     
     vals = snmpSession.walk( netsnmp.VarList(
@@ -200,52 +250,48 @@ warning and critical values are tuples for respectively : actives_cnx,max_cnx,to
                     message.append("VirtualServer OID names mismatch: {} != {}".format(name1, name2))
                     return 3
                 # check status
-                status = int(status)
-                if status < 0 or status > 5:
-                    retcode = 3
-                    message.append("Failed to retrieve {} status information".format(name1))
-                else:
-                    message.append("VirtualServer {} status {} ({})\n".format(name1, ltmVsStatusAvailState[status][0], ltmVsStatusAvailState[status][1]))
-                    if status == 4:
-                        retcode = 3
-                    elif status == 1 or status == 5:
-                        retcode = 1
-                    elif status == 0 or status == 3:
-                        retcode = 2
-                # check actives connections
-                ret = 0
-                cnx_actives = int(cnx_actives)
-                if cnx_actives > warn[0]:
-                    ret = 1
-                if cnx_actives > crit[0]:
-                    ret = 2
-                message.append(" - {} actives connections".format(str(cnx_actives)))
-                if ret > retcode:
+                retcode = _check_avail(status, 'VirtualServer', name1)
+                ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
+                if ret < 3 and ret > retcode:
                     retcode = ret
-                if perfdata:
-                    perfmsg.append("'cnx_actv': {}:{}:{}".format(str(cnx_actives), str(warn[0]), str(crit[0])))
-                # check total connections
-                ret = 0
-                cnx_total = int(cnx_total)
-                if cnx_total > warn[2]:
-                    ret = 1
-                if cnx_total > crit[2]:
-                    ret = 2
-                message.append(" - {} max connections".format(str(cnx_total)))
-                if ret > retcode:
-                    retcode = ret
-                if perfdata:
-                    perfmsg.append("'cnx_total': {}:{}:{}".format(str(cnx_total), str(warn[2]), str(crit[2])))
-
-                message.append( - "bytes in: {}, bytes out: {}\n".format(bytes_in, bytes_out))
-                if perfdata:
-                    perfmsg.append("'bytes_in':".format(bytes_in))
-                    perfmsg.append("'bytes_out':".format(bytes_out))
-
-                return retcode
+    else:
+        retcode = 3
+        message.append('Failed to retrieve VirtualServer data')
+    
+    return retcode
 
 
+def get_node_stats(virtualServer, perfdata=False):
 
+    warn = ('200000','200000','200000')
+    if isinstance(args.warning,str) and args.warning is not None:
+        warn = tuple(args.warning.split(','))
+    crit = ('250000','250000','250000')
+    if isinstance(args.critical,str) and args.critical is not None:
+        crit = tuple(args.critical.split(','))
+
+    vals = snmpSession.walk( netsnmp.VarList(
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.7'),     # Nom des Nodes (Serveurs Réels)
+#        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.3'),     # Statut des Nodes (Serveurs Réels) /!\ deprecated
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.3'),     # node availability
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.9'),     # Connexions actives par Node (Serveur Réel)
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.7'),     # Connexions maximales par Node (Serveur Réel)
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.8'),     # Connexions totale par Node (Serveur Réel)
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.4'),     # Traffic entrant en octets par Node (Serveurs Réels)
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.6'),     # Traffic sortant en octets par Node  (Serveurs Réels)
+    ))
+    if vals:
+        for name, status, cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out in tuple( vals[i:i+7] for i in range(0, len(vals), 7)):
+            # check status
+            retcode = _check_avail(status, 'Node', name)
+            ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
+            if ret < 3 and ret > retcode:
+                retcode = ret
+    else:
+        retcode = 3
+        message.append('Failed to retrieve VirtualServer data')
+    
+    return retcode
 
 
 
@@ -278,9 +324,11 @@ message = []
 perfdata = []
 
 
-#retcode = _get_health_status()
-#retcode = _enum_virtualservers()
-retcode = _get_vs_stats()
+#retcode = get_health_status()
+#retcode = enum_virtualservers()
+#retcode = get_vs_stats()
+retcode = get_node_stats('',True)
+
 
 
 print("{}: ".format(retText[retcode]) + "".join(message))
