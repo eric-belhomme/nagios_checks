@@ -24,23 +24,25 @@ retText = [
 def print_longHelp():
     print("""
 F5 Load-Balancer running BIG-IP OS Nagios plugin
+================================================
 
-*** modes ***
-  help      : This help     
-  health    : Reports global system health
-  http      : Reports global HTTP requests
-  enumvs    : enumerates 'VirtualServers' configured on the appliance
-  vsstats   : get statistics for a given VirtualServer
-  nodestats : get statistics for remote Nodes (real servers)
+-= modes =-
+-----------
+* help - This help     
+* health - Reports global system health
+* http - Reports global HTTP requests
+* enumvs - enumerates 'VirtualServers' configured on the appliance
+* vsstats - get statistics for a given VirtualServer
+* nodestats - get statistics for remote Nodes (real servers)
 
     """)
-    print('*** health mode ***\n' + get_health_status.__doc__)
-    print('*** http mode ***\n' + get_http_stats.__doc__)
-    print('*** enumvs mode ***\n' + enum_virtualservers.__doc__)
-    print('*** vsstats mode ***\n' + get_vs_stats.__doc__)
-    print('*** nodestats mode ***\n' + get_node_stats.__doc__)
+    print('-= health mode =-\n-----------------\n' + get_health_status.__doc__)
+    print('-= http mode =-\n---------------\n' + get_http_stats.__doc__)
+    print('-= enumvs mode =-\n-----------------\n' + enum_virtualservers.__doc__)
+    print('-= vsstats mode =-\n------------------\n' + get_vs_stats.__doc__)
+    print('-= nodestats mode =-\n--------------------\n' + get_node_stats.__doc__)
    
-    print("Copyright {author} <{authmail}> under {license} license".format(
+    print("---\nCopyright {author} <{authmail}> under {license} license".format(
         author = __author__, authmail = __contact__, license = __license__))
     exit(0)
 
@@ -49,7 +51,7 @@ def get_health_status(perfdata):
     '''
 Report global system health: PSU health, chassis temperature, and fans health
 
-Warning and critical triggers (respectively '-w' and '-c' command-line
+Warning and critical triggers (respectively `-w` and `-c` command-line
 parameters) are passed as 3 comma-separated values for respectively
 PSU, temp, and fans:
 
@@ -59,7 +61,7 @@ PSU, temp, and fans:
         -> 3 failed fans
 
 Additionnaly, it is possible to alter default behaviour with the following
-flags, passed with '--arg1' command-lien parameter:
+flags, passed with `--arg1` command-lien parameter:
 
     ignoremissingpsu : don't trigger any warning or error is a PSU is
                        reported as missing
@@ -203,15 +205,14 @@ def _enum_virtualservers():
 
 def enum_virtualservers():
     '''
-Enumerates 'VirtualServers' configured on the appliance
+Enumerates **VirtualServers** configured on the appliance
 
 This mode is mainly used to ease Nagios configuration to define how to use
-'vsstats' mode
+**vsstats** mode
 
-This mode does not require any additional parameters
+This mode does not require any additional parameters.
 
     '''
-
     vals = _enum_virtualservers()
     if vals:
         message.append('F5 VirtualServers list: \n')
@@ -281,27 +282,27 @@ def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
 
 def get_vs_stats(virtualServer, perfdata=False):
     '''
-Get statistics for a given VirtualServer, the target VS is passed as '--arg1'
+Get statistics for a given VirtualServer, the target VS is passed as `--arg1`
 parameter.
 
 The check returns the following informations:
-  o VirtualServer name and status,
-  o connections details (current, max, total)
-  o bandwidth usage (incoming bytes, outgoing bytes)
+* VirtualServer name and status,
+* connections details (current, max, total)
+* bandwidth usage (incoming bytes, outgoing bytes)
 
-Warning and critical triggers (respectively '-w' and '-c' command-line
+Warning and critical triggers (respectively `-w` and `-c` command-line
 parameters) are passed as 3 comma-separated values for respectively
 active connections, max connections, total connections
 
 If ommited, defaults to :
+
     -w 200000,200000,200000
     -c 250000,250000,250000
 
-Additionally, if '--perfdata' command-line argument is triggered, Nagios
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
 perfdata are computed and appended to the output.
 
     '''
-
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
@@ -339,26 +340,27 @@ perfdata are computed and appended to the output.
 
 
 def get_node_stats(perfdata=False):
-    '''
+    """
 Get statistics for Nodes, the 'real' servers behind the Load Balancer.
 
 The check returns for each node found the following informations:
-  o Node name and status,
-  o connections details (current, max, total)
-  o bandwidth usage (incoming bytes, outgoing bytes)
+* Node name and status,
+* connections details (current, max, total)
+* bandwidth usage (incoming bytes, outgoing bytes)
 
-Warning and critical triggers (respectively '-w' and '-c' command-line
+Warning and critical triggers (respectively `-w` and `-c` command-line
 parameters) are passed as 3 comma-separated values for respectively
 active connections, max connections, total connections
 
 If ommited, defaults to :
+
     -w 200000,200000,200000
     -c 250000,250000,250000
 
-Additionally, if '--perfdata' command-line argument is triggered, Nagios
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
 perfdata are computed and appended to the output.
 
-    '''
+    """
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
@@ -394,14 +396,14 @@ def get_http_stats(perfdata):
     '''
 Reports global HTTP requests
 
-Warning and critical triggers (respectively '-w' and '-c' command-line
+Warning and critical triggers (respectively `-w` and `-c` command-line
 parameters) 
 
 If ommited, defaults to :
     -w 200000
     -c 250000
     
-Additionally, if '--perfdata' command-line argument is triggered, Nagios
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
 perfdata are computed and appended to the output.
 
 No additional arguments are required
