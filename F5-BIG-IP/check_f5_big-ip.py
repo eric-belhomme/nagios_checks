@@ -143,14 +143,14 @@ arg1 contains flags that alters the check behaviour :
     return retcode
 
 
-
-
+def _enum_virtualservers():
+    return snmpSession.walk(netsnmp.VarList(
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.13.2.1.1'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.2.3.1.1')))
 
 def enum_virtualservers():
 
-    vals = snmpSession.walk(netsnmp.VarList(
-        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.13.2.1.1'),
-        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.2.3.1.1')))
+    vals = _enum_virtualservers()
     if vals:
         message.append('F5 VirtualServers list: \n')
         for item in set(vals):
@@ -327,7 +327,10 @@ if args.mode == 'health':
 elif args.mode == 'enumvs':
     retcode = enum_virtualservers()
 elif args.mode == 'vsstats':
-    retcode = get_vs_stats(args.perfdata)
+    if isinstance(args.arg1,str) and args.arg1 is not None and args.arg1 in _enum_virtualservers():
+        retcode = get_vs_stats(args.arg1, args.perfdata)
+    else:
+        message.append('arg1 not provided (VirtualServer)')
 elif args.mode == 'nodestats':
     retcode = get_node_stats(args.perfdata)
 
