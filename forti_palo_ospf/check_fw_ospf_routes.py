@@ -1,12 +1,18 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # vim: expandtab sw=4 ts=4:
-#
-# retrieve the number of OSPF routes on Palto Alto firewalls throught CLI by SSH
-#
-# 2018-10-29 Eric Belhomme <eric.belhomme@axians.com> - Initial write
+"""
+Retrieve the number of OSPF routes on Palto Alto firewalls throught CLI by SSH
+2018-10-29 Eric Belhomme <rico-github@ricozome.net> - Initial work
+Published under MIT license
+"""
 
 import argparse, paramiko, netsnmp
 from pprint import pprint
+
+__author__ = 'Eric Belhomme'
+__contact__ = 'rico-github@ricozome.net'
+__license__ = 'MIT'
 
 def getPaltoAltoRoutes(fwServer, fwUser, fwPasswd):
     # dFlags = {
