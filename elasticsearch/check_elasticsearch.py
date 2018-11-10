@@ -1,21 +1,21 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # vim: expandtab sw=4 ts=4:
-#
-# Nagios plugin that checks ElasticSearch health status
-#
-# 2018-10-31 Eric Belhomme <eric.belhomme@axians.com> - Initial write
+"""
+Nagios plugin that checks ElasticSearch health status
+2018-10-31 Eric Belhomme <rico-github@ricozome.net> - Initial work
+Published under MIT license
+"""
 
 import sys, argparse, paramiko, requests, json, re
 
+__author__ = 'Eric Belhomme'
+__contact__ = 'rico-github@ricozome.net'
+__license__ = 'MIT'
+
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
-
-
-#curl -u admin:nOVvIxqiMYXhT_X -XGET 'https://172.20.9.18:9200/_cluster/health?pretty' -k
-
 parser = argparse.ArgumentParser()
-
 parser.add_argument('-H', '--hostname', type=str, help='Elastic server hostname or IP address', required=True)
 parser.add_argument('-U', '--username', type=str, help='username', required=True)
 parser.add_argument('-P', '--password', type=str, help='user password', required=True)
@@ -28,12 +28,12 @@ proto = 'http'
 if args.ssl:
     proto='https'
 
+#curl -u admin:nOVvIxqiMYXhT_X -XGET 'https://172.20.9.18:9200/_cluster/health?pretty' -k
 url = "{proto}://{hostname}:{port}/_cluster/health".format(
     proto=proto,
     hostname=args.hostname,
     port=args.port,
 )
-
 
 NagiosExit = { 'OK': 0, 'WARNING': 1, 'CRITICAL': 2, 'UNKNOWN': 3 }
 req = requests.get( url, auth=(args.username, args.password), verify=False )
@@ -87,7 +87,6 @@ if req:
 else:
     exitcode = NagiosExit['UNKNOWN']
     message = "Unable to request URL {}".format(url)
-
 
 print(message)
 exit(exitcode)
