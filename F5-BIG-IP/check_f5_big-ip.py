@@ -250,7 +250,7 @@ warning and critical values are tuples for respectively : actives_cnx,max_cnx,to
                     message.append("VirtualServer OID names mismatch: {} != {}".format(name1, name2))
                     return 3
                 # check status
-                retcode = _check_avail(status, 'VirtualServer', name1)
+                retcode = _check_avail(int(status), 'VirtualServer', name1)
                 ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
                 if ret < 3 and ret > retcode:
                     retcode = ret
@@ -283,7 +283,7 @@ def get_node_stats(virtualServer, perfdata=False):
     if vals:
         for name, status, cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out in tuple( vals[i:i+7] for i in range(0, len(vals), 7)):
             # check status
-            retcode = _check_avail(status, 'Node', name)
+            retcode = _check_avail(int(status), 'Node', name)
             ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
             if ret < 3 and ret > retcode:
                 retcode = ret
