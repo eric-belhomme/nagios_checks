@@ -280,7 +280,7 @@ def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
     return retcode
     
 
-def get_vs_stats(virtualServer, perfdata=False):
+def get_vs_stats(vsfilter, perfdata=False):
     '''
 Get statistics for a given VirtualServer, the target VS is passed as `--arg1`
 parameter.
@@ -303,6 +303,10 @@ Additionally, if `--perfdata` command-line argument is triggered, Nagios
 perfdata are computed and appended to the output.
 
     '''
+    regex = None
+    if vsfilter is not None:
+        regex = re.compile(vsfilter)
+
     warn = ('200000','200000','200000')
     if isinstance(args.warning,str) and args.warning is not None:
         warn = tuple(args.warning.split(','))
@@ -322,16 +326,18 @@ perfdata are computed and appended to the output.
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.10.2.3.1.9')))   # bytes out (counter64)
     if vals:
         for name1, status, name2, cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out in tuple( vals[i:i+8] for i in range(0, len(vals), 8)):
-            if virtualServer in name1:
-                # VS name match
-                if name1 != name2:
-                    message.append("VirtualServer OID names mismatch: {} != {}".format(name1, name2))
-                    return 3
-                # check status
-                retcode = _check_avail(int(status), 'VirtualServer', name1)
-                ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
-                if ret < 3 and ret > retcode:
-                    retcode = ret
+            if regex is not None:
+                if re.match(regex, name1) != None:
+                    continue
+            # VS name match
+            if name1 != name2:
+                message.append("VirtualServer OID names mismatch: {} != {}".format(name1, name2))
+                retcode = 3
+            # check status
+            retcode = _check_avail(int(status), 'VirtualServer', name1)
+            ret = _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
+            if ret < 3 and ret > retcode:
+                retcode = ret
     else:
         retcode = 3
         message.append('Failed to retrieve VirtualServer data')
@@ -409,13 +415,13 @@ perfdata are computed and appended to the output.
 No additional arguments are required
 
     '''
-    retcode = 3
+    retcode = 0
     warn = '200000'
     if isinstance(args.warning,str) and args.warning is not None:
-        warn = int(args.warning.split)
+        warn = int(args.warning)
     crit = '250000'
     if isinstance(args.critical,str) and args.critical is not None:
-        crit = int(args.critical.split)
+        crit = int(args.critical)
 
     vals = map( int, snmpSession.get(netsnmp.VarList(netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.56.0'))))
     if len(vals):
@@ -452,7 +458,7 @@ parser.add_argument('-m', '--mode', type=str, help='Operational mode',
         'nodestats',
     ],
     required=True)
-parser.add_argument('-x', '--arg1', type=str, help='optional argument 1 (eg. vs or node name, health flags)')    
+parser.add_argument('-x', '--arg1', type=str, help='optional argument 1 (eg. vs or node name, health flags)', default=None) 
 parser.add_argument('-p', '--perfdata', help='enable pnp4nagios perfdata', action='store_true')
 parser.add_argument('-w', '--warning', type=str, nargs='?', help='warning trigger', default=10)
 parser.add_argument('-c', '--critical', type=str, nargs='?', help='critical trigger', default=6)
@@ -471,14 +477,11 @@ elif args.mode =='health':
 elif args.mode == 'enumvs':
     retcode = enum_virtualservers()
 elif args.mode == 'vsstats':
-    if isinstance(args.arg1,str) and args.arg1 is not None and args.arg1 in _enum_virtualservers():
-        retcode = get_vs_stats(args.arg1, args.perfdata)
-    else:
-        message.append('arg1 not provided (VirtualServer)')
+    retcode = get_vs_stats(args.arg1, args.perfdata)
 elif args.mode == 'nodestats':
     retcode = get_node_stats(args.perfdata)
 elif args.mode == 'http':
-    get_http_stats(args.perfdata)
+    retcode = get_http_stats(args.perfdata)
 
 print("{}: ".format(retText[retcode]) + "".join(message))
 if args.perfdata and len(perfdata):
