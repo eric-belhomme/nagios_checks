@@ -20,7 +20,7 @@ NagiosExit = { 'OK': 0, 'WARNING': 1, 'CRITICAL': 2, 'UNKNOWN': 3 }
 def processHealth(out):
     '''
 Retrieve Elasticearch cluster health by requesting _cluster/health API:
-curl -ku admin:password -XGET 'https://172.20.9.18:9200/_cluster/health?pretty'
+curl -ku admin:password -XGET 'https://elastic.local:9200/_cluster/health?pretty'
 
 warning and critical trggers are useless for this check
     '''
@@ -69,7 +69,9 @@ warning and critical trggers are useless for this check
 
 def processIndices(text, warn, crit):
     '''
-Retrieve indinces catalog and triggers warning or critical depending of:
+Retrieve indinces catalog:
+curl -ku 'admin:password' -XGET 'https://elastic.local:9200/_cat/indices'
+then triggers warning or critical depending of:
   * the status of open index (if some are not green status)
   * the number of open triggers (if it exceed trigger values defined by warning
     or critical command-line parameters)
