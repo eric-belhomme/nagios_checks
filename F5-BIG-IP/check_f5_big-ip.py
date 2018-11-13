@@ -454,8 +454,8 @@ parser.add_argument('-m', '--mode', type=str, help='Operational mode',
     required=True)
 parser.add_argument('-x', '--arg1', type=str, help='optional argument 1 (eg. vs or node name, health flags)')    
 parser.add_argument('-p', '--perfdata', help='enable pnp4nagios perfdata', action='store_true')
-parser.add_argument('-w', '--warning', type=int, nargs='?', help='warning trigger', default=10)
-parser.add_argument('-c', '--critical', type=int, nargs='?', help='critical trigger', default=6)
+parser.add_argument('-w', '--warning', type=str, nargs='?', help='warning trigger', default=10)
+parser.add_argument('-c', '--critical', type=str, nargs='?', help='critical trigger', default=6)
 
 args = parser.parse_args()
 retcode = 3
