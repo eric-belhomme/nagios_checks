@@ -10,6 +10,8 @@ F5 Load-Balancer running BIG-IP OS Nagios plugin
 * enumvs - enumerates 'VirtualServers' configured on the appliance
 * vsstats - get statistics for a given VirtualServer
 * nodestats - get statistics for remote Nodes (real servers)
+* mem_tmm - get TMM meory usage stats (global)
+* sessions - get client and server sessions stats (global)
 
     
 -= health mode =-
@@ -115,6 +117,43 @@ If ommited, defaults to :
 
 Additionally, if `--perfdata` command-line argument is triggered, Nagios
 perfdata are computed and appended to the output.
+
+    
+-= mem_tmm mode =-
+--------------------
+
+Reports consumed memory by TMM processes
+
+Warning and critical triggers (respectively `-w` and `-c` command-line
+parameters) are exprimed as percentage values
+
+If ommited, defaults to :
+    -w 85
+    -c 95
+    
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+No additional arguments are required
+
+    
+-= sessions mode =-
+--------------------
+
+Reports clients & servers sessions
+
+Warning and critical triggers (respectively `-w` and `-c` command-line
+parameters) are comma separated and respectvely refers to client and
+server values, and are exprimed as percentage values
+
+If ommited, defaults to :
+    -w 90,90
+    -c 95,95
+    
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+No additional arguments are required
 
     
 ---
