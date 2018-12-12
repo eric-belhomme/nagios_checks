@@ -4,6 +4,7 @@
 """
 F5 Load-Balancer running BIG-IP OS Nagios plugin
 2018-11-10 Eric Belhomme <rico-github@ricozome.net> - Initial work
+2018-12-12 Eric Belhomme <rico-github@ricozome.net> - added mem_tmm and sessions modes, fixed perfdata
 Published under MIT license
 """
 import argparse, netsnmp
@@ -34,6 +35,8 @@ F5 Load-Balancer running BIG-IP OS Nagios plugin
 * enumvs - enumerates 'VirtualServers' configured on the appliance
 * vsstats - get statistics for a given VirtualServer
 * nodestats - get statistics for remote Nodes (real servers)
+* mem_tmm - get TMM meory usage stats (global)
+* sessions - get client and server sessions stats (global)
 
     """)
     print('-= health mode =-\n-----------------\n' + get_health_status.__doc__)
@@ -41,6 +44,8 @@ F5 Load-Balancer running BIG-IP OS Nagios plugin
     print('-= enumvs mode =-\n-----------------\n' + enum_virtualservers.__doc__)
     print('-= vsstats mode =-\n------------------\n' + get_vs_stats.__doc__)
     print('-= nodestats mode =-\n--------------------\n' + get_node_stats.__doc__)
+    print('-= mem_tmm mode =-\n--------------------\n' + get_mem_tmm.__doc__)
+    print('-= sessions mode =-\n--------------------\n' + get_sessions.__doc__)
    
     print("---\nCopyright {author} <{authmail}> under {license} license".format(
         author = __author__, authmail = __contact__, license = __license__))
@@ -259,8 +264,8 @@ def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
     message.append(" - {} actives connections".format(str(cnx_actives)))
     if ret > retcode:
         retcode = ret
-    if perfdata:
-        perfmsg.append("'cnx_actv': {}:{}:{}".format(str(cnx_actives), str(warn[0]), str(crit[0])))
+    if args.perfdata:
+        perfmsg.append("'cnx_actv'={};{};{}".format(str(cnx_actives), str(warn[0]), str(crit[0])))
     # check total connections
     ret = 0
     cnx_total = int(cnx_total)
@@ -271,12 +276,12 @@ def _get_stats(cnx_actives, cnx_max, cnx_total, bytes_in, bytes_out, warn, crit)
     message.append(" - {} max connections".format(str(cnx_total)))
     if ret > retcode:
         retcode = ret
-    if perfdata:
-        perfmsg.append("'cnx_total': {}:{}:{}".format(str(cnx_total), str(warn[2]), str(crit[2])))
+    if args.perfdata:
+        perfmsg.append("'cnx_total'={};{};{}".format(str(cnx_total), str(warn[2]), str(crit[2])))
     message.append( " - bytes in: {}, bytes out: {}\n".format(bytes_in, bytes_out))
-    if perfdata:
-        perfmsg.append("'bytes_in':".format(bytes_in))
-        perfmsg.append("'bytes_out':".format(bytes_out))
+    if args.perfdata:
+        perfmsg.append("'bytes_in'=".format(bytes_in))
+        perfmsg.append("'bytes_out'=".format(bytes_out))
     return retcode
     
 
@@ -432,7 +437,7 @@ No additional arguments are required
             retcode = 2
         message.append("global HTTP requests: {}".format(val))
         if perfdata:
-            perfmsg.append("'http_req': {}:{}:{}".format(str(val), str(warn), str(crit)))
+            perfmsg.append("'http_req'={};{};{}".format(str(val), str(warn), str(crit)))
     else:
         retcode = 3
         message.append('Failed to retrieve HTTP session data')
@@ -440,7 +445,114 @@ No additional arguments are required
     return retcode
 
 
+def get_mem_tmm(perfdata):
+    '''
+Reports consumed memory by TMM processes
 
+Warning and critical triggers (respectively `-w` and `-c` command-line
+parameters) are exprimed as percentage values
+
+If ommited, defaults to :
+    -w 85
+    -c 95
+    
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+No additional arguments are required
+
+    '''
+    retcode = 3
+    memtot, memused = (0,0)
+
+    warn = '85'
+    if isinstance(args.warning,str) and args.warning is not None:
+        warn = int(args.warning)
+    crit = '95'
+    if isinstance(args.critical,str) and args.critical is not None:
+        crit = int(args.critical)
+
+    vals = map( int, snmpSession.get(netsnmp.VarList(netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.44.0'))))
+    if len(vals):
+        memtot = vals[0]
+    vals = map( int, snmpSession.get(netsnmp.VarList(netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.45.0'))))
+    if len(vals):
+        memused = vals[0]
+
+    if memtot and memused:
+        retcode = 0
+        warn = (int(warn) * memtot) / 100
+        crit = (int(crit) * memtot) / 100
+
+        if memused > warn:
+            retcode = 1
+        if memused > crit:
+            retcode = 2
+        message.append("TMM memory: {} MB / {} MB ({}%)".format(str(memused/(1024**2)), str(memtot/(1024**2)), str((memused * 100)/memtot)))
+        if perfdata:
+            perfmsg.append("'mem_tmm'={};{};{};0;{}".format(str(memused), str(warn), str(crit), str(memtot)))
+    else:
+        retcode = 3
+        message.append('Failed to retrieve TMM memory data')
+
+    return retcode
+
+
+def get_sessions(perfdata):
+    '''
+Reports clients & servers sessions
+
+Warning and critical triggers (respectively `-w` and `-c` command-line
+parameters) are comma separated and respectvely refers to client and
+server values, and are exprimed as percentage values
+
+If ommited, defaults to :
+    -w 90,90
+    -c 95,95
+    
+Additionally, if `--perfdata` command-line argument is triggered, Nagios
+perfdata are computed and appended to the output.
+
+No additional arguments are required
+
+    '''
+    retcode = 3
+
+    warn = ('90', '90')
+    if isinstance(args.warning,str) and args.warning is not None:
+        warn = tuple(args.warning.split(','))
+    crit = ('95', '95')
+    if isinstance(args.critical,str) and args.critical is not None:
+        crit = tuple(args.critical.split(','))
+
+    (cliCurSess, serCurSess, cliMaxSess, serMaxSess, cliTotSess, serTotSess) = map(int,
+        snmpSession.get(netsnmp.VarList(
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.8.0'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.15.0'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.6.0'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.13.0'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.7.0'),
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.1.1.2.1.14.0')
+        )))
+
+    if cliTotSess and serTotSess:
+        retcode = 0
+
+        warn = ( (int(warn[0]) * cliTotSess) / 100, (int(warn[1]) * serTotSess) / 100 )
+        crit = ( (int(crit[0]) * cliTotSess) / 100, (int(crit[1]) * serTotSess) / 100 )
+        if cliCurSess + serCurSess > max(warn):
+            retcode = 1
+        if cliCurSess + serCurSess > max(crit):
+            retcode = 2
+
+        message.append( "client sessions: {} (max: {}) / {}".format(str(cliCurSess), str(cliMaxSess), str(cliTotSess)))
+        message.append( " - ")
+        message.append( "server sessions: {} (max: {}) / {}".format(str(serCurSess), str(serMaxSess), str(serTotSess)))
+
+    if perfdata:
+        perfmsg.append("'cli_sess'={};{};{};0;{}".format(str(cliCurSess), str(warn[0]), str(crit[0]), str(cliTotSess)))
+        perfmsg.append("'srv_sess'={};{};{};0;{}".format(str(serCurSess), str(warn[1]), str(crit[1]), str(serTotSess)))
+    return retcode
 
 
 ##### Main starts here
@@ -456,6 +568,8 @@ parser.add_argument('-m', '--mode', type=str, help='Operational mode',
         'enumvs',
         'vsstats',
         'nodestats',
+        'mem_tmm',
+        'sessions',
     ],
     required=True)
 parser.add_argument('-x', '--arg1', type=str, help='optional argument 1 (eg. vs or node name, health flags)', default=None) 
@@ -466,7 +580,7 @@ parser.add_argument('-c', '--critical', type=str, nargs='?', help='critical trig
 args = parser.parse_args()
 retcode = 3
 message = []
-perfdata = []
+perfmsg = []
 
 snmpSession = netsnmp.Session(Version=2, DestHost=args.hostname, Community=args.community)
 
@@ -482,9 +596,13 @@ elif args.mode == 'nodestats':
     retcode = get_node_stats(args.perfdata)
 elif args.mode == 'http':
     retcode = get_http_stats(args.perfdata)
+elif args.mode == 'mem_tmm':
+    retcode = get_mem_tmm(args.perfdata)
+elif args.mode == 'sessions':
+    retcode = get_sessions(args.perfdata)
 
 print("{}: ".format(retText[retcode]) + "".join(message))
-if args.perfdata and len(perfdata):
-    print('|' + "".join(' '))
+if args.perfdata and len(perfmsg):
+    print('|' + " ".join(perfmsg))
 
 exit(retcode)
