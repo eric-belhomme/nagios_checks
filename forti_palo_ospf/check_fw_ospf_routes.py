@@ -66,7 +66,8 @@ def getPaltoAltoRoutes(fwServer, fwUser, fwPasswd):
 
 def getFortinetRoutes(fwServer, fwUser, fwPasswd):
     routes = []
-    reroute = re.compile('^O(\*|\s)(?P<flags>N1|E1|E2)?\s+(?P<dest>[\d{1,3}\.\/]+)\s+.*via\s(?P<hop>[0-9\.]+),\s+(?P<interface>.+),\s+((?P<agew>\d+)w)?((?P<aged>\d+)d)?((?P<ageh>\d+)h)?((?P<agem>\d+)m)?\s*$')
+    # reroute = re.compile('^O(\*|\s)(?P<flags>N1|E1|E2)?\s+(?P<dest>[\d{1,3}\.\/]+)\s+.*via\s(?P<hop>[0-9\.]+),\s+(?P<interface>.+),\s+((?P<agew>\d+)w)?((?P<aged>\d+)d)?((?P<ageh>\d+)h)?((?P<agem>\d+)m)?\s*$')
+    reroute = re.compile('^O(\*|\s)(?P<flags>N1|E1|E2)?\s+(?P<dest>[\d{1,3}\.\/]+)\s+.*via\s(?P<hop>[0-9\.]+),\s+(?P<interface>.+),\s+(((?P<agew>\d+)w)?((?P<aged>\d+)d)?((?P<ageh>\d+)h)?((?P<agem>\d+)m)?((?P<age2h>\d+):(?P<age2m>\d+):\d+)?)\s*$')
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect( fwServer, username=fwUser, password=fwPasswd)
@@ -86,8 +87,12 @@ def getFortinetRoutes(fwServer, fwUser, fwPasswd):
                 age += int(match.group('aged')) * 86400
             if match.group('ageh') > 0:
                 age += int(match.group('ageh')) * 3600
+            if match.group('age2h') > 0:
+                age += int(match.group('age2h')) * 3600
             if match.group('agem') > 0:
                 age += int(match.group('agem')) * 60
+            if match.group('age2m') > 0:
+                age += int(match.group('age2m')) * 60
 
             if match.group('flags') > 0:
                 flags = match.group('flags').strip().rstrip().split(' ')
