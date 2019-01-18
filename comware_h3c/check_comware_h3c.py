@@ -14,7 +14,7 @@ __author__ = 'Eric Belhomme'
 __contact__ = 'rico-github@ricozome.net'
 __license__ = 'MIT'
 
-recode = 3
+retcode = 3
 output = []
 perfdata = []
 message = ''
@@ -31,6 +31,7 @@ re_prompt = re.compile(r"^<.*>.*$")
 
 def process_cpu_usage(bufferOut, warning, critical):
 
+    retcode = 3
     cpu_usage = []
     re_slot = re.compile(r"^Slot (?P<slot>\d+) CPU.*")
     re_cpu = re.compile(r"^\s+(?P<cpu>\d+)% in last 1 min.*")
@@ -39,7 +40,7 @@ def process_cpu_usage(bufferOut, warning, critical):
     for line in bufferOut:
 
         match = re_prompt.match(line)
-        if match:
+        if match and len(cpu_usage) > 0:
             break
 
         match = re_slot.match(line)
@@ -80,11 +81,12 @@ def process_memory_usage(bufferOut, warning, critical):
     re_total = re.compile(r'^System Total.*:\s+(?P<total>\d+).*$')
     re_used = re.compile(r'^Total Used.*:\s+(?P<used>\d+).*$')
 
-    total, used = 1, 1
+    retcode = 3
+    total, used = 1, 0
 
     for line in bufferOut:
 
-        if re_prompt.match(line):
+        if re_prompt.match(line) and total is not 1 and used is not 0:
             break
 
         match = re_total.match(line)
@@ -122,17 +124,14 @@ args = parser.parse_args()
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect( args.hostname, username=args.username, password=args.password)
-stdin, stdout, stderr = ssh.exec_command("")
+ssh.connect( args.hostname, username=args.username, password=args.password, look_for_keys=False)
     
 if args.type.startswith('cpu-load'):
-    #stdin, stdout, stderr = ssh.exec_command('dis cpu-usage')
-    stdin, stdout, stderr = ssh.exec_command('cat /tmp/cpu')
+    stdin, stdout, stderr = ssh.exec_command('dis cpu-usage')
     stdout=stdout.readlines()
     process_cpu_usage(stdout, args.warning, args.critical)
 elif args.type.startswith('memory'):
-    stdin, stdout, stderr = ssh.exec_command('cat /tmp/mem')
-    #stdin, stdout, stderr = ssh.exec_command('dis memory')
+    stdin, stdout, stderr = ssh.exec_command('dis memory')
     stdout=stdout.readlines()
     process_memory_usage(stdout, args.warning, args.critical)
 
