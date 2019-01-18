@@ -124,18 +124,22 @@ args = parser.parse_args()
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect( args.hostname, username=args.username, password=args.password, look_for_keys=False)
-    
-if args.type.startswith('cpu-load'):
-    stdin, stdout, stderr = ssh.exec_command('dis cpu-usage')
-    stdout=stdout.readlines()
-    process_cpu_usage(stdout, args.warning, args.critical)
-elif args.type.startswith('memory'):
-    stdin, stdout, stderr = ssh.exec_command('dis memory')
-    stdout=stdout.readlines()
-    process_memory_usage(stdout, args.warning, args.critical)
 
-ssh.close()
+try:
+    ssh.connect( args.hostname, username=args.username, password=args.password, look_for_keys=False)
+    
+    if args.type.startswith('cpu-load'):
+        stdin, stdout, stderr = ssh.exec_command('dis cpu-usage')
+        stdout=stdout.readlines()
+        retcode = process_cpu_usage(stdout, args.warning, args.critical)
+    elif args.type.startswith('memory'):
+        stdin, stdout, stderr = ssh.exec_command('dis memory')
+        stdout=stdout.readlines()
+        retcode = process_memory_usage(stdout, args.warning, args.critical)
+
+    ssh.close()
+except:
+    output.append("{}: Failed to connect on {} as user '{}'".format(rettxt[retcode], args.hostname, args.username))
 
 for out in output:
     message += "{}\n".format(out)
