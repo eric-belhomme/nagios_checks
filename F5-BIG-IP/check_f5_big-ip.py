@@ -380,9 +380,8 @@ perfdata are computed and appended to the output.
         crit = tuple(args.critical.split(','))
 
     vals = snmpSession.walk( netsnmp.VarList(
-        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.7'),     # Nom des Nodes (Serveurs Réels)
-#        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.3'),     # Statut des Nodes (Serveurs Réels) /!\ deprecated
-        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.3.2.1.3'),     # node availability
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.5.6.2.1.9'),     # Nom des Nodes (Serveurs Réels)
+        netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.5.6.2.1.5'),     # node availability
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.9'),     # Connexions actives par Node (Serveur Réel)
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.7'),     # Connexions maximales par Node (Serveur Réel)
         netsnmp.Varbind('.1.3.6.1.4.1.3375.2.2.4.2.3.1.8'),     # Connexions totale par Node (Serveur Réel)
